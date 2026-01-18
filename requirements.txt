@@ -1,0 +1,9 @@
+flask
+svgpathtools
+shapely
+numpy
+Pillow
+opencv-python-headless
+rembg
+onnxruntime
+gunicorn

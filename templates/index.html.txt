@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG 批量内缩工具</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --card-bg: #2d2d2d;
+            --text-main: #e0e0e0;
+            --accent: #4CAF50;
+            --accent-hover: #45a049;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        h1 { margin-top: 0; font-size: 1.5rem; color: #fff; }
+        p.subtitle { color: #888; font-size: 0.9rem; margin-bottom: 2rem; }
+
+        .form-group { margin-bottom: 1.5rem; text-align: left; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
+        
+        /* 拖拽上传区域 */
+        .upload-area {
+            border: 2px dashed #555;
+            padding: 2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+            position: relative;
+        }
+        .upload-area:hover { border-color: var(--accent); background-color: rgba(76, 175, 80, 0.1); }
+        .upload-area input[type="file"] {
+            position: absolute; width: 100%; height: 100%; top: 0; left: 0; opacity: 0; cursor: pointer;
+        }
+        .file-info { margin-top: 10px; font-size: 0.85rem; color: var(--accent); }
+
+        /* 输入框样式 */
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #555;
+            background-color: #333;
+            color: #fff;
+            box-sizing: border-box;
+        }
+
+        /* 按钮 */
+        button.btn-submit {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.3s;
+        }
+        button.btn-submit:hover { background-color: var(--accent-hover); }
+        button:disabled { background-color: #555; cursor: not-allowed; }
+
+        .loading { display: none; margin-top: 1rem; color: #aaa; }
+        .spinner {
+            display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite; margin-right: 10px; vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>SVG 路径内缩工具</h1>
+    <p class="subtitle">基于 Shapely 的高精度路径偏移 | 批量处理</p>
+
+    <form action="/process" method="post" enctype="multipart/form-data" id="processForm">
+        
+        <div class="form-group">
+            <label for="indent">内缩距离 (px)</label>
+            <input type="number" id="indent" name="indent" value="8" min="1" max="100">
+            <small style="color:#666; display:block; margin-top:5px;">默认 8px，数值越大内缩越多</small>
+        </div>
+
+        <div class="form-group">
+            <label>上传 SVG 文件夹或文件</label>
+            <div class="upload-area" id="dropZone">
+                <span id="uploadText">点击选择文件夹 / 拖拽文件到此处</span>
+                <input type="file" name="files" id="fileInput" webkitdirectory multiple accept=".svg">
+            </div>
+            <div class="file-info" id="fileInfo"></div>
+        </div>
+
+        <button type="submit" class="btn-submit" id="submitBtn">开始批量处理并导出</button>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div> 正在计算路径偏移，请稍候...
+        </div>
+    </form>
+</div>
+
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const fileInfo = document.getElementById('fileInfo');
+    const form = document.getElementById('processForm');
+    const loading = document.getElementById('loading');
+    const submitBtn = document.getElementById('submitBtn');
+    const uploadText = document.getElementById('uploadText');
+
+    // 处理文件选择显示
+    fileInput.addEventListener('change', function(e) {
+        const count = this.files.length;
+        if (count > 0) {
+            fileInfo.textContent = `已选择 ${count} 个文件`;
+            uploadText.textContent = `已加载 ${count} 个文件`;
+            submitBtn.disabled = false;
+        } else {
+            fileInfo.textContent = '';
+            uploadText.textContent = '点击选择文件夹 / 拖拽文件到此处';
+        }
+    });
+
+    // 表单提交动画
+    form.addEventListener('submit', function(e) {
+        if (fileInput.files.length === 0) {
+            e.preventDefault();
+            alert('请先选择文件！');
+            return;
+        }
+        loading.style.display = 'block';
+        submitBtn.disabled = true;
+        submitBtn.textContent = '处理中...';
+    });
+</script>
+
+</body>
+</html>

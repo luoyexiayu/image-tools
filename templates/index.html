@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>图像全能工厂 V9.2</title>
+    <style>
+        :root { --bg: #1a1a1a; --panel: #2d2d2d; --text: #e0e0e0; --accent: #4CAF50; --preview-bg: #181818; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; height: 100vh; display: flex; overflow: hidden; }
+        .sidebar { width: 340px; background: var(--panel); padding: 20px; display: flex; flex-direction: column; border-right: 1px solid #444; box-shadow: 2px 0 10px rgba(0,0,0,0.3); z-index: 10; overflow-y: auto; }
+        .sidebar h1 { margin: 0 0 5px 0; font-size: 1.2rem; }
+        .sidebar p.ver { color: #888; font-size: 0.8rem; margin-bottom: 20px; }
+        .section { margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #333; }
+        .section:last-child { border-bottom: none; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 0.9rem; color: #ccc; }
+        .mode-switch { display: flex; background: #222; border-radius: 6px; padding: 3px; gap: 2px; }
+        .mode-item { flex: 1; text-align: center; padding: 8px 4px; font-size: 0.8rem; cursor: pointer; border-radius: 4px; color: #888; transition: 0.2s; white-space: nowrap; }
+        .mode-item.active { background: #444; color: #fff; font-weight: bold; }
+        .mode-item input { display: none; }
+        .slider-container { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        input[type="range"] { flex: 1; accent-color: var(--accent); cursor: pointer; }
+        input[type="number"] { width: 50px; background: #333; border: 1px solid #555; color: #fff; padding: 5px; border-radius: 4px; text-align: center; }
+        .color-picker-row { display: flex; align-items: center; justify-content: space-between; background: #333; padding: 8px 12px; border-radius: 6px; margin-top: 10px; }
+        input[type="color"] { border: none; width: 30px; height: 30px; padding: 0; background: none; cursor: pointer; }
+        .radio-group { display: flex; gap: 10px; background: #333; padding: 5px; border-radius: 6px; }
+        .radio-group label { margin: 0; flex: 1; text-align: center; font-size: 0.8rem; padding: 6px; cursor: pointer; border-radius: 4px; color: #888; font-weight: normal; }
+        .radio-group input { display: none; }
+        .radio-group label.active { background: #555; color: #fff; font-weight: bold; }
+        .upload-area { border: 2px dashed #555; border-radius: 8px; padding: 20px 10px; text-align: center; cursor: pointer; transition: all 0.3s; background: rgba(255,255,255,0.03); display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80px; }
+        .upload-area:hover, .upload-area.dragover { border-color: var(--accent); background: rgba(76, 175, 80, 0.1); color: white; }
+        .upload-icon { font-size: 1.8rem; margin-bottom: 5px; opacity: 0.8; }
+        .upload-text { font-size: 0.9rem; font-weight: 500; }
+        .upload-sub { font-size: 0.75rem; color: #777; margin-top: 2px; }
+        .hidden-input { display: none; }
+        .footer { margin-top: auto; padding-top:20px; }
+        #submitBtn { width: 100%; padding: 14px; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem; transition: 0.2s; }
+        #submitBtn:disabled { background: #555; cursor: not-allowed; }
+        
+        .main-area { flex: 1; background: var(--preview-bg); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+        
+        /* 预览区改动：增加 overflow hidden 以支持内部变换 */
+        .preview-viewport { width: 90%; height: 80%; overflow: hidden; display: flex; justify-content: center; align-items: center; border: 2px dashed #333; border-radius: 8px; position: relative; }
+        
+        /* 增加 cursor: grab */
+        .preview-wrapper { 
+            display: flex; justify-content: center; align-items: center; 
+            transform-origin: center; transition: transform 0.1s linear; cursor: grab; 
+            width: 100%; height: 100%;
+        }
+        .preview-wrapper:active { cursor: grabbing; }
+
+        .bg-transparent { background-image: linear-gradient(45deg, #222 25%, transparent 25%), linear-gradient(-45deg, #222 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #222 75%), linear-gradient(-45deg, transparent 75%, #222 75%); background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px; }
+        .bg-black { background-color: #000000; border-color: #222; }
+        
+        .preview-img { max-width: 100%; max-height: 100%; object-fit: contain; pointer-events: none; }
+        
+        .empty-tip { color: #555; font-size: 1.2rem; }
+        .tag { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; pointer-events: none; z-index: 99; }
+        .loading-mask { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; color: white; font-weight: bold; backdrop-filter: blur(2px); border-radius: 8px; z-index: 100; }
+        .compare-hint { margin-top: 15px; color: #666; font-size: 0.9rem; display: none; }
+        .hidden { display: none; }
+        .sub-label { font-size: 0.8rem; color: #888; font-weight: normal; margin-bottom: 4px; }
+        .section-title { color: var(--accent); font-size: 0.85rem; margin-bottom: 10px; font-weight: bold; letter-spacing: 1px; }
+
+        /* 移动端/平板适配 */
+        @media (max-width: 900px) {
+            body { flex-direction: column; overflow: auto; height: auto; min-height: 100vh; }
+            .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid #444; box-shadow: none; overflow: visible; padding: 15px; box-sizing: border-box; }
+            .main-area { height: 60vh; min-height: 400px; border-top: 1px solid #333; padding: 0; box-sizing: border-box; }
+            .preview-viewport { width: 100%; height: 100%; border: none; border-radius: 0; }
+            .section { margin-bottom: 15px; padding-bottom: 10px; }
+            .slider-container input[type="range"] { height: 25px; }
+        }
+        
+        .zoom-controls { position: absolute; bottom: 20px; right: 20px; display: flex; gap: 10px; z-index: 99; }
+        .zoom-btn { background: rgba(0,0,0,0.6); color: white; border: 1px solid #555; width: 32px; height: 32px; border-radius: 4px; cursor: pointer; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; }
+        .zoom-btn:hover { background: var(--accent); border-color: var(--accent); }
+    </style>
+</head>
+<body>
+<div class="sidebar">
+    <div><h1>图像全能工厂</h1><p class="ver">V9.2 显微镜版</p></div>
+    <form id="mainForm" action="/process" method="post" enctype="multipart/form-data">
+        <div class="section">
+            <label>处理模式</label>
+            <div class="mode-switch">
+                <label class="mode-item active" id="tab-shrink"><input type="radio" name="mode" value="shrink" checked onchange="changeMode()"> 📐内缩</label>
+                <label class="mode-item" id="tab-vector"><input type="radio" name="mode" value="vectorize" onchange="changeMode()"> ✒️转矢量</label>
+                <label class="mode-item" id="tab-matting"><input type="radio" name="mode" value="matting" onchange="changeMode()"> 🎨抠图描边</label>
+            </div>
+            <div id="vector-options" class="hidden"><div class="color-picker-row"><span style="font-size:0.85rem">预览图形颜色</span><input type="color" id="vectorColor" value="#FFFFFF" oninput="triggerPreview()"></div></div>
+        </div>
+        
+        <div class="section" id="section-shrink">
+            <label>内缩程度</label>
+            <div class="slider-container"><input type="range" id="slider-shrink" min="1" max="50" value="8" oninput="updateVal('shrink', this.value)"><input type="number" id="num-shrink" name="indent" value="8" min="1" max="100" oninput="updateVal('shrink', this.value)"></div>
+        </div>
+
+        <div class="section hidden" id="section-vector">
+            <label>1. 平滑度</label><div class="sub-label">数值越小细节越多</div>
+            <div class="slider-container"><input type="range" id="slider-smooth" min="1" max="20" value="4" oninput="updateVal('smooth', this.value)"><input type="number" id="num-smooth" name="smoothness" value="4" min="1" max="20" oninput="updateVal('smooth', this.value)"></div>
+            <div style="height:15px"></div><label>2. 圆角大小</label>
+            <div class="slider-container"><input type="range" id="slider-radius" min="0" max="50" value="0" oninput="updateVal('radius', this.value)"><input type="number" id="num-radius" name="radius" value="0" min="0" max="100" oninput="updateVal('radius', this.value)"></div>
+        </div>
+
+        <div class="section hidden" id="section-matting">
+            <div class="section-title">Step 1: 智能抠图</div>
+            <label>Alpha 阈值</label>
+            <div class="slider-container"><input type="range" id="slider-threshold" min="0" max="250" value="10" oninput="updateVal('threshold', this.value)"><input type="number" id="num-threshold" name="threshold" value="10" min="0" max="250" oninput="updateVal('threshold', this.value)"></div>
+            <div style="height:10px"></div>
+            <label>边缘修边 (正=内缩)</label>
+            <div class="slider-container"><input type="range" id="slider-shift" min="0" max="20" value="0" oninput="updateVal('shift', this.value)"><input type="number" id="num-shift" name="shift" value="0" min="0" max="20" oninput="updateVal('shift', this.value)"></div>
+            <div style="margin-top:20px; border-top:1px dashed #444; paddingTop:15px"></div>
+            <div class="section-title">Step 2: 创意描边</div>
+            <label>描边宽度 (0=无)</label>
+            <div class="slider-container"><input type="range" id="slider-sw" min="0" max="50" value="0" oninput="updateVal('sw', this.value)"><input type="number" id="num-sw" name="stroke_width" value="0" min="0" max="50" oninput="updateVal('sw', this.value)"></div>
+            <div class="color-picker-row"><span style="font-size:0.85rem">描边颜色</span><input type="color" id="strokeColor" value="#FFFFFF" oninput="triggerPreview()"></div>
+            <div style="height:10px"></div>
+            <label style="margin-bottom:5px">描边位置</label>
+            <div class="radio-group">
+                <label class="active" onclick="setStrokePos('outer', this)">外<input type="radio" name="stroke_pos" value="outer" checked></label>
+                <label onclick="setStrokePos('center', this)">中<input type="radio" name="stroke_pos" value="center"></label>
+                <label onclick="setStrokePos('inner', this)">内<input type="radio" name="stroke_pos" value="inner"></label>
+            </div>
+        </div>
+
+        <div class="section">
+            <label>选择文件</label>
+            <div class="upload-area" id="dropZone"><div class="upload-icon">📂</div><div class="upload-text" id="file-label">点击上传</div><div class="upload-sub" id="file-sub">支持 SVG / PNG / JPG</div></div>
+            <input type="file" name="files" id="fileInput" class="hidden-input" multiple accept=".svg,.png,.jpg,.jpeg,.webp,.bmp">
+        </div>
+        <div class="footer"><button type="submit" id="submitBtn">批量处理并下载</button></div>
+    </form>
+</div>
+<div class="main-area" id="previewArea">
+    <div class="preview-viewport" id="viewport">
+        <div class="preview-wrapper bg-transparent" id="imgWrapper" style="display:none">
+            <img src="" id="previewImg" class="preview-img">
+        </div>
+        <span class="tag" id="previewTag" style="display:none">预览效果</span>
+        <div class="loading-mask" id="loading">处理中...</div>
+    </div>
+    
+    <div class="empty-tip" id="emptyTip">请先上传图片预览</div>
+    <div class="compare-hint" id="compareHint">💡 滚轮缩放 · 拖拽移动 · 空格/长按对比</div>
+    
+    <div class="zoom-controls" id="zoomControls" style="display:none">
+        <div class="zoom-btn" onclick="resetZoom()">⟲</div>
+    </div>
+</div>
+<script>
+    let currentFile = null; let originalData = null; let previewData = null; let debounceTimer;
+    
+    // Zoom & Pan Variables
+    let scale = 1;
+    let panning = false;
+    let pointX = 0, pointY = 0;
+    let startX = 0, startY = 0;
+    
+    const fileInput = document.getElementById('fileInput'); const dropZone = document.getElementById('dropZone'); const fileLabel = document.getElementById('file-label'); const fileSub = document.getElementById('file-sub');
+    const viewport = document.getElementById('viewport');
+    const wrapper = document.getElementById('imgWrapper');
+    const img = document.getElementById('previewImg');
+    const tag = document.getElementById('previewTag');
+
+    dropZone.onclick = () => fileInput.click();
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => dropZone.addEventListener(e, (ev) => { ev.preventDefault(); ev.stopPropagation(); }, false));
+    ['dragenter', 'dragover'].forEach(e => dropZone.addEventListener(e, () => dropZone.classList.add('dragover'), false));
+    ['dragleave', 'drop'].forEach(e => dropZone.addEventListener(e, () => dropZone.classList.remove('dragover'), false));
+    dropZone.addEventListener('drop', (e) => { const files = e.dataTransfer.files; if(files.length){ fileInput.files = files; handleFiles(files); } }, false);
+    fileInput.onchange = (e) => handleFiles(e.target.files);
+    
+    function handleFiles(files) { 
+        if(files.length){ 
+            fileLabel.innerText = `✅ 已就绪 ${files.length} 个文件`; 
+            fileSub.innerText = files[0].name + (files.length > 1 ? ` 等...` : ''); 
+            currentFile = files[0]; 
+            const reader = new FileReader(); 
+            reader.onload = (e) => { 
+                originalData = e.target.result; 
+                showPreviewArea(); 
+                resetZoom(); // Reset zoom on new file
+                triggerPreview(); 
+            }; 
+            reader.readAsDataURL(currentFile); 
+        } 
+    }
+
+    // --- Zoom & Pan Logic ---
+    function setTransform() {
+        wrapper.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`;
+    }
+
+    function resetZoom() {
+        scale = 1; pointX = 0; pointY = 0;
+        setTransform();
+    }
+
+    viewport.onwheel = function(e) {
+        e.preventDefault();
+        const xs = (e.clientX - viewport.getBoundingClientRect().left - pointX) / scale;
+        const ys = (e.clientY - viewport.getBoundingClientRect().top - pointY) / scale;
+        const delta = -e.deltaY;
+        
+        if (delta > 0) scale *= 1.1;
+        else scale /= 1.1;
+        
+        // Limit scale
+        if(scale < 0.1) scale = 0.1;
+        if(scale > 20) scale = 20;
+
+        // Center zoom calculation (simplified)
+        // pointX = e.clientX - viewport.getBoundingClientRect().left - xs * scale;
+        // pointY = e.clientY - viewport.getBoundingClientRect().top - ys * scale;
+        setTransform();
+    }
+    
+    // Mouse Pan
+    viewport.onmousedown = function(e) {
+        e.preventDefault();
+        startX = e.clientX - pointX;
+        startY = e.clientY - pointY;
+        panning = true;
+        wrapper.style.cursor = 'grabbing';
+    }
+
+    document.onmousemove = function(e) {
+        if (!panning) return;
+        e.preventDefault();
+        pointX = e.clientX - startX;
+        pointY = e.clientY - startY;
+        setTransform();
+    }
+
+    document.onmouseup = function() {
+        panning = false;
+        wrapper.style.cursor = 'grab';
+        
+        // If not panning (just clicked), checking for compare logic below
+        if(Math.abs(pointX - (startX - event.clientX)) < 5 && Math.abs(pointY - (startY - event.clientY)) < 5) {
+             // Treat as click? No, we handle compare separately now to avoid conflict
+        }
+    }
+    
+    // Double click to reset
+    viewport.ondblclick = resetZoom;
+
+    // --- Compare Logic (Spacebar or Long Press) ---
+    // Conflict resolution: Dragging should not trigger compare.
+    // Solution: Only trigger if not panning.
+    
+    function showOriginal() { if(originalData){ img.src = originalData; tag.innerText = '原图'; tag.style.background = 'rgba(33, 150, 243, 0.8)'; if(document.querySelector('input[name="mode"]:checked').value==='vectorize') wrapper.classList.remove('bg-black'); wrapper.classList.add('bg-transparent'); } }
+    function showResult() { if(previewData){ img.src = previewData; tag.innerText = '预览结果'; tag.style.background = 'rgba(76, 175, 80, 0.8)'; if(document.querySelector('input[name="mode"]:checked').value==='vectorize'){ wrapper.classList.remove('bg-transparent'); wrapper.classList.add('bg-black'); } } }
+
+    document.addEventListener('keydown', (e) => { if(e.code === 'Space') { e.preventDefault(); showOriginal(); } });
+    document.addEventListener('keyup', (e) => { if(e.code === 'Space') { e.preventDefault(); showResult(); } });
+    
+    // Mobile Long Press Logic
+    let pressTimer;
+    viewport.addEventListener('touchstart', (e) => { 
+        // e.preventDefault(); // Don't block scroll completely
+        pressTimer = setTimeout(() => showOriginal(), 300); // 300ms long press
+    });
+    viewport.addEventListener('touchend', (e) => { 
+        clearTimeout(pressTimer); 
+        showResult(); 
+    });
+    viewport.addEventListener('touchmove', () => clearTimeout(pressTimer)); // Cancel if moving
+
+    // --- Standard UI Logic ---
+    function updateVal(type, val) {
+        if(type==='shrink'){ document.getElementById('slider-shrink').value = val; document.getElementById('num-shrink').value = val; }
+        else if(type==='smooth'){ document.getElementById('slider-smooth').value = val; document.getElementById('num-smooth').value = val; }
+        else if(type==='radius'){ document.getElementById('slider-radius').value = val; document.getElementById('num-radius').value = val; }
+        else if(type==='threshold'){ document.getElementById('slider-threshold').value = val; document.getElementById('num-threshold').value = val; }
+        else if(type==='shift'){ document.getElementById('slider-shift').value = val; document.getElementById('num-shift').value = val; }
+        else if(type==='sw'){ document.getElementById('slider-sw').value = val; document.getElementById('num-sw').value = val; }
+        triggerPreview();
+    }
+    function setStrokePos(pos, el) { document.querySelectorAll('.radio-group label').forEach(l => l.classList.remove('active')); el.classList.add('active'); el.querySelector('input').checked = true; triggerPreview(); }
+    function changeMode() {
+        const mode = document.querySelector('input[name="mode"]:checked').value; const wrapper = document.getElementById('imgWrapper');
+        document.querySelectorAll('.mode-item').forEach(el => el.classList.remove('active'));
+        ['section-shrink','section-vector','section-matting','vector-options'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        wrapper.classList.remove('bg-black'); wrapper.classList.add('bg-transparent');
+        if(mode==='shrink'){ document.getElementById('tab-shrink').classList.add('active'); document.getElementById('section-shrink').classList.remove('hidden'); }
+        else if(mode==='vectorize'){ document.getElementById('tab-vector').classList.add('active'); document.getElementById('section-vector').classList.remove('hidden'); document.getElementById('vector-options').classList.remove('hidden'); wrapper.classList.remove('bg-transparent'); wrapper.classList.add('bg-black'); }
+        else if(mode==='matting'){ document.getElementById('tab-matting').classList.add('active'); document.getElementById('section-matting').classList.remove('hidden'); }
+        triggerPreview();
+    }
+    function showPreviewArea() { document.getElementById('emptyTip').style.display = 'none'; document.getElementById('imgWrapper').style.display = 'flex'; document.getElementById('compareHint').style.display = 'block'; document.getElementById('zoomControls').style.display = 'flex'; tag.style.display = 'block'; }
+    function triggerPreview() { if(!currentFile) return; document.getElementById('loading').style.display = 'flex'; clearTimeout(debounceTimer); debounceTimer = setTimeout(sendPreviewRequest, 500); }
+    function sendPreviewRequest() {
+        const formData = new FormData(); formData.append('file', currentFile);
+        formData.append('mode', document.querySelector('input[name="mode"]:checked').value);
+        formData.append('indent', document.getElementById('num-shrink').value);
+        formData.append('smoothness', document.getElementById('num-smooth').value);
+        formData.append('radius', document.getElementById('num-radius').value);
+        formData.append('color', document.getElementById('vectorColor').value);
+        formData.append('threshold', document.getElementById('num-threshold').value);
+        formData.append('shift', document.getElementById('num-shift').value);
+        formData.append('stroke_width', document.getElementById('num-sw').value);
+        formData.append('stroke_color', document.getElementById('strokeColor').value);
+        formData.append('stroke_pos', document.querySelector('input[name="stroke_pos"]:checked').value);
+        fetch('/preview', { method: 'POST', body: formData }).then(r=>r.json()).then(d => { if(d.image){ previewData=d.image; document.getElementById('previewImg').src=previewData; document.getElementById('previewTag').innerText='预览结果'; document.getElementById('previewTag').style.background='rgba(76, 175, 80, 0.8)'; } }).catch(console.error).finally(() => document.getElementById('loading').style.display='none');
+    }
+    document.getElementById('mainForm').onsubmit = function() { const btn = document.getElementById('submitBtn'); btn.disabled=true; btn.innerText='正在打包下载...'; setTimeout(()=>{ btn.disabled=false; btn.innerText='批量处理并下载'; }, 3000); };
+</script>
+</body>
+</html>
