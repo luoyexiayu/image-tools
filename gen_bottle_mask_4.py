@@ -6,8 +6,9 @@ from shapely.geometry import Polygon, MultiPolygon
 from PIL import Image, ImageFilter, ImageOps, ImageChops
 from rembg import remove, new_session
 
-# 初始化 session
-rembg_session = new_session()
+# --- 关键修改：使用 u2netp (轻量版) ---
+# 这样可以将内存占用控制在 200MB 以内，适配 Render 免费版
+rembg_session = new_session("u2netp")
 
 BLACK_COLORS = {'#000', '#000000', 'black', 'rgb(0,0,0)', 'rgba(0,0,0,1)'}
 
