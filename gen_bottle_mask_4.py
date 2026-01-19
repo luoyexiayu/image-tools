@@ -3,11 +3,10 @@ import cv2
 import numpy as np
 from svgpathtools import svg2paths2, wsvg, parse_path
 from shapely.geometry import Polygon, MultiPolygon
-from PIL import Image, ImageFilter, ImageOps, ImageChops
+from PIL import Image, ImageFilter, ImageOps
 from rembg import remove, new_session
 
-# --- 关键修改：使用 u2netp (轻量版) ---
-# 这样可以将内存占用控制在 200MB 以内，适配 Render 免费版
+# 【关键修改】使用 u2netp (轻量版) 适配 512MB 内存
 rembg_session = new_session("u2netp")
 
 BLACK_COLORS = {'#000', '#000000', 'black', 'rgb(0,0,0)', 'rgba(0,0,0,1)'}
@@ -148,7 +147,6 @@ def convert_bitmap_to_svg(input_path, output_path, fill_color='black', smoothnes
              svg_attributes={'width': str(width), 'height': str(height), 'viewBox': f'0 0 {width} {height}'})
         return final_output
     except Exception as e:
-        print(f"Error: {e}")
         return None
 
 def hex_to_rgb(hex_color):
@@ -163,6 +161,7 @@ def apply_stroke(img_pil, width, color_hex, position='outer'):
     alpha_np = np.array(a)
     kernel_size = 2 * width + 1
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
+    stroke_mask = None
     if position == 'outer':
         dilated = cv2.dilate(alpha_np, kernel)
         stroke_mask = Image.fromarray(dilated)

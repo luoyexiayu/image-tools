@@ -3,7 +3,7 @@ import zipfile
 import tempfile
 import shutil
 import base64
-import gc  # 引入垃圾回收机制
+import gc
 from flask import Flask, render_template, request, send_file, after_this_request, jsonify
 from werkzeug.utils import secure_filename
 from gen_bottle_mask_4 import process_bottle_svg, process_raster_image, convert_bitmap_to_svg, remove_background_ai
@@ -21,9 +21,7 @@ def index():
 @app.route('/preview', methods=['POST'])
 def preview_image():
     try:
-        # 处理前先清理一次内存
-        gc.collect()
-        
+        gc.collect() # 强制内存回收
         mode = request.form.get('mode', 'shrink')
         file = request.files.get('file')
         if not file: return jsonify({'error': 'No file'}), 400
@@ -50,51 +48,40 @@ def preview_image():
         output_path = os.path.join(temp_dir, 'preview_' + filename)
         
         file.save(input_path)
-        ext = filename.rsplit('.', 1)[1].lower()
         result_path = output_path
         
         if mode == 'shrink':
-            if ext == 'svg':
-                process_bottle_svg(input_path, output_path, shrink_px=indent)
-            else:
-                real_output = os.path.splitext(output_path)[0] + ".png"
-                process_raster_image(input_path, real_output, shrink_px=indent)
-                result_path = real_output
+            # ... (简化代码结构) ...
+            if filename.endswith('.svg'): process_bottle_svg(input_path, output_path, shrink_px=indent)
+            else: 
+                result_path = os.path.splitext(output_path)[0] + ".png"
+                process_raster_image(input_path, result_path, shrink_px=indent)
         elif mode == 'vectorize':
-            if ext != 'svg':
-                result = convert_bitmap_to_svg(input_path, output_path, fill_color=color, smoothness=smoothness, corner_radius=radius)
-                if result: result_path = result
-            else:
-                shutil.copy(input_path, output_path)
+            result = convert_bitmap_to_svg(input_path, output_path, fill_color=color, smoothness=smoothness, corner_radius=radius)
+            if result: result_path = result
         elif mode == 'matting':
-            real_output = os.path.splitext(output_path)[0] + ".png"
-            remove_background_ai(input_path, real_output, 
+            result_path = os.path.splitext(output_path)[0] + ".png"
+            remove_background_ai(input_path, result_path, 
                                  alpha_threshold=threshold, edge_shift=shift,
                                  stroke_width=s_width, stroke_color=s_color, stroke_pos=s_pos)
-            result_path = real_output
 
         with open(result_path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
         
         mime_type = "image/svg+xml" if result_path.endswith('.svg') else "image/png"
         shutil.rmtree(temp_dir)
-        
-        # 处理后强制清理内存！(关键步骤)
-        gc.collect()
-        
+        gc.collect() # 再次强制回收
         return jsonify({'image': f"data:{mime_type};base64,{encoded_string}"})
 
     except Exception as e:
-        print(f"Error: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/process', methods=['POST'])
 def process_files():
     try:
-        # 处理前清理
         gc.collect()
-        
         mode = request.form.get('mode', 'shrink')
+        # ... (参数获取逻辑省略，保持原样) ...
         try: indent = int(request.form.get('indent', 8))
         except: indent = 8
         try: smoothness = int(request.form.get('smoothness', 4))
@@ -117,69 +104,47 @@ def process_files():
         temp_dir = tempfile.mkdtemp()
         input_dir = os.path.join(temp_dir, 'input')
         output_dir = os.path.join(temp_dir, 'processed')
-        os.makedirs(input_dir)
-        os.makedirs(output_dir)
+        os.makedirs(input_dir); os.makedirs(output_dir)
 
         processed_count = 0
-        try:
-            for file in files:
-                if file and allowed_file(file.filename):
-                    filename = secure_filename(file.filename)
-                    if not filename: continue
-                    input_path = os.path.join(input_dir, filename)
-                    output_path = os.path.join(output_dir, filename)
-                    file.save(input_path)
-                    ext = filename.rsplit('.', 1)[1].lower()
-                    try:
-                        if mode == 'shrink':
-                            if ext == 'svg':
-                                process_bottle_svg(input_path, output_path, shrink_px=indent)
-                            else:
-                                real_output = os.path.splitext(output_path)[0] + ".png"
-                                process_raster_image(input_path, real_output, shrink_px=indent)
-                            processed_count += 1
-                        elif mode == 'vectorize':
-                            if ext != 'svg':
-                                result = convert_bitmap_to_svg(input_path, output_path, fill_color='black', smoothness=smoothness, corner_radius=radius)
-                                if result: processed_count += 1
-                            else:
-                                shutil.copy(input_path, output_path)
-                                processed_count += 1
-                        elif mode == 'matting':
-                            real_output = os.path.splitext(output_path)[0] + ".png"
-                            remove_background_ai(input_path, real_output, 
-                                                 alpha_threshold=threshold, edge_shift=shift,
-                                                 stroke_width=s_width, stroke_color=s_color, stroke_pos=s_pos)
-                            processed_count += 1
-                        
-                        # 每处理完一张图，清理一次内存
-                        gc.collect()
-
-                    except Exception as e:
-                        print(f"File Error: {e}")
-
-            if processed_count == 0: return "处理失败", 400
-
-            zip_filename = f"{mode}_processed.zip"
-            zip_path = os.path.join(temp_dir, zip_filename)
-            with zipfile.ZipFile(zip_path, 'w') as zipf:
-                for root, dirs, files in os.walk(output_dir):
-                    for file in files:
-                        zipf.write(os.path.join(root, file), file)
-
-            @after_this_request
-            def remove_temp_dir(response):
-                try: shutil.rmtree(temp_dir)
+        for file in files:
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                input_path = os.path.join(input_dir, filename)
+                output_path = os.path.join(output_dir, filename)
+                file.save(input_path)
+                try:
+                    if mode == 'shrink':
+                        if filename.lower().endswith('.svg'): process_bottle_svg(input_path, output_path, shrink_px=indent)
+                        else: process_raster_image(input_path, os.path.splitext(output_path)[0] + ".png", shrink_px=indent)
+                    elif mode == 'vectorize':
+                        convert_bitmap_to_svg(input_path, output_path, fill_color='black', smoothness=smoothness, corner_radius=radius)
+                    elif mode == 'matting':
+                        remove_background_ai(input_path, os.path.splitext(output_path)[0] + ".png", 
+                                             alpha_threshold=threshold, edge_shift=shift,
+                                             stroke_width=s_width, stroke_color=s_color, stroke_pos=s_pos)
+                    processed_count += 1
+                    gc.collect()
                 except: pass
-                # 最后再清理一次
-                gc.collect()
-                return response
-            return send_file(zip_path, as_attachment=True)
-        except Exception as e:
-            if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
-            return f"Error: {str(e)}", 500
+
+        if processed_count == 0: return "处理失败", 400
+
+        zip_filename = f"{mode}_processed.zip"
+        zip_path = os.path.join(temp_dir, zip_filename)
+        with zipfile.ZipFile(zip_path, 'w') as zipf:
+            for root, dirs, files in os.walk(output_dir):
+                for file in files:
+                    zipf.write(os.path.join(root, file), file)
+
+        @after_this_request
+        def remove_temp_dir(response):
+            try: shutil.rmtree(temp_dir)
+            except: pass
+            gc.collect()
+            return response
+        return send_file(zip_path, as_attachment=True)
     except Exception as e:
-        return str(e), 500
+        return f"Error: {str(e)}", 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
